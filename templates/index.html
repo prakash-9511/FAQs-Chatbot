@@ -1,1 +1,96 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>RCOEM Chatbot</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  </head>
+  <body>
+    <main class="shell">
+      <section class="chat-panel" aria-label="RCOEM chatbot">
+        <header class="chat-header">
+          <div>
+            <p class="eyebrow">RCOEM Website Assistant</p>
+            <h1>Ask about admissions, courses, hostels, placements, and contact details.</h1>
+          </div>
+          <span class="status" title="Model status">
+            {% if model_ready %}Fine-tuned model{% else %}FAQ fallback{% endif %}
+          </span>
+        </header>
 
+        <div id="messages" class="messages" aria-live="polite">
+          <article class="message bot">
+            <div class="avatar">R</div>
+            <p>Hello. I can answer verified RCOEM FAQ questions. Try asking “How are admissions offered?” or “Does RCOEM have hostel facilities?”</p>
+          </article>
+        </div>
+
+        <form id="chat-form" class="composer">
+          <label class="sr-only" for="message">Message</label>
+          <input id="message" name="message" autocomplete="off" placeholder="Type your RCOEM question..." required>
+          <button type="submit" aria-label="Send message">
+            <span>Send</span>
+          </button>
+        </form>
+      </section>
+    </main>
+
+    <script>
+      const form = document.querySelector("#chat-form");
+      const input = document.querySelector("#message");
+      const messages = document.querySelector("#messages");
+
+      function appendMessage(role, text, meta = "") {
+        const article = document.createElement("article");
+        article.className = `message ${role}`;
+
+        const avatar = document.createElement("div");
+        avatar.className = "avatar";
+        avatar.textContent = role === "user" ? "U" : "R";
+
+        const bubble = document.createElement("div");
+        const paragraph = document.createElement("p");
+        paragraph.textContent = text;
+        bubble.appendChild(paragraph);
+
+        if (meta) {
+          const small = document.createElement("small");
+          small.textContent = meta;
+          bubble.appendChild(small);
+        }
+
+        article.appendChild(avatar);
+        article.appendChild(bubble);
+        messages.appendChild(article);
+        messages.scrollTop = messages.scrollHeight;
+      }
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const text = input.value.trim();
+        if (!text) return;
+
+        appendMessage("user", text);
+        input.value = "";
+        input.disabled = true;
+
+        try {
+          const response = await fetch("/api/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ message: text })
+          });
+          const data = await response.json();
+          const meta = data.reference ? `Source: ${data.reference}` : data.source;
+          appendMessage("bot", data.answer, meta);
+        } catch (error) {
+          appendMessage("bot", "The chatbot server is not responding. Please try again.");
+        } finally {
+          input.disabled = false;
+          input.focus();
+        }
+      });
+    </script>
+  </body>
+</html>
